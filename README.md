@@ -145,8 +145,7 @@
 
 ## 📞 Контакты и поддержка
 
-- 🌐 **Сайт:** [ваш-сайт.com](https://ваш-сайт.com)
-- 📧 **Email:** support@ваш-сайт.com
+- 🌐 **Сайт:** (https://npekpacho.ru/kim/)
 - 💬 **Issues:** [GitHub Issues](https://github.com/npekpacHo/kim/issues)
 
 ---
