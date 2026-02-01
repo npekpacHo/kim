@@ -1,0 +1,62 @@
+# Операционная система
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Windows
+*.lnk
+
+# Редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Временные файлы
+*.tmp
+*.temp
+*.bak
+*.log
+
+# Node.js (если будет использоваться)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Архивы и сборки
+*.zip
+*.rar
+*.7z
+dist/
+build/
+
+# Секретные данные
+.env
+secrets.json
+config.local.js
+
+# Chrome extension specific
+*.pem
+*.crx
+
+# Тестовые файлы
+test/
+tests/
+*.test.js
+coverage/
+
+# Документация (генерируемая)
+docs/_build/
+
+# Прочее
+.cache/
