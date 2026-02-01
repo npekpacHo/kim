@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KIM</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <div class="brand">
+        <img class="logoImg" src="icon.png" alt="KIM Helper">
+        <div class="brandText">
+          <div class="name">KCS IFTTT Mass Mapper</div>
+          <div class="sub">быстрый доступ к KinCony Smart</div>
+        </div>
+      </div>
+      <div class="pill" id="netHint">LAN</div>
+    </header>
+
+    <section class="card">
+      <label class="lbl" for="host">IP / Host / URL</label>
+      <input id="host" class="inp" placeholder="192.168.1.11 или 192.168.0.4" />
+
+      <div class="row">
+        <button id="btnThis" class="btn">Из вкладки</button>
+        <button id="btnOpen" class="btn primary">Открыть</button>
+      </div>
+
+      <div class="row">
+        <button id="btnStart" class="btn">Запустить UI</button>
+        <button id="btnScan" class="btn">Автопоиск</button>
+      </div>
+
+      <div class="row">
+        <button id="btnClear" class="btn danger">Сброс</button>
+      </div>
+
+      <div id="status" class="status"> </div>
+    </section>
+
+    <section class="card">
+      <div class="cardTitle">
+        <span>Контроллеры KinCony</span>
+        <button id="btnRefresh" class="linkBtn">проверить</button>
+      </div>
+
+      <div id="list" class="list"></div>
+
+      <div class="hint">
+        Этот список формируется автоматически
+      </div>
+    </section>
+
+    <footer class="foot">
+      <a class="copy" href="https://t.me/elekt_riki" target="_blank" rel="noopener noreferrer">
+        © elekt_riki • 2026
+      </a>
+      <span class="muted">KIM Helper v0.21</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

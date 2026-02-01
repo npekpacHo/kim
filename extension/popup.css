@@ -1,0 +1,217 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 360px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #f6f7f9;
+  color: #111;
+}
+
+.wrap { padding: 12px; }
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.logoImg{
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: block;
+  object-fit: contain;
+  padding: 4px;                 /* чуть воздуха, чтобы не липло к краям */
+  box-sizing: border-box;
+}
+
+
+.brand { display:flex; align-items:center; gap:10px; }
+.brandText .name { font-weight: 800; font-size: 14px; line-height: 1.1; }
+.brandText .sub { font-size: 11px; color: #666; margin-top: 2px; }
+
+.pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #d7dbe0;
+  background: #fff;
+  color: #333;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e3e6ea;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  margin-bottom: 10px;
+}
+
+.cardTitle {
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.linkBtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11px;
+  color: #0d6efd;
+}
+.linkBtn:hover { text-decoration: underline; }
+
+.lbl { display:block; font-size:12px; color:#333; margin:4px 0 6px; }
+
+.inp {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid #cfd4da;
+  border-radius: 10px;
+  font-size: 13px;
+  outline: none;
+}
+.inp:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13,110,253,0.12);
+}
+
+.row { display:flex; gap:8px; margin-top: 8px; }
+
+.btn {
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid #cfd4da;
+  background: #f8f9fa;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn:hover { background:#eef1f4; }
+.btn.primary { background:#0d6efd; border-color:#0d6efd; color:#fff; }
+.btn.primary:hover { background:#0b5ed7; }
+.btn.danger { background:#dc3545; border-color:#dc3545; color:#fff; }
+.btn.danger:hover { background:#bb2d3b; }
+
+.status { margin-top: 8px; font-size: 12px; min-height: 16px; color:#333; }
+.status.ok { color:#0f5132; }
+.status.bad { color:#842029; }
+
+.list { display:flex; flex-direction: column; gap: 8px; }
+
+.item {
+  border: 1px solid #e3e6ea;
+  border-radius: 10px;
+  padding: 8px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.itemLeft { min-width: 0; }
+.itemTop { display:flex; align-items:center; gap:6px; }
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid #d7dbe0;
+  background: #fff;
+  color: #333;
+}
+.badge.ok { border-color: rgba(15,81,50,0.35); color:#0f5132; background: rgba(15,81,50,0.06); }
+.badge.bad { border-color: rgba(132,32,41,0.35); color:#842029; background: rgba(132,32,41,0.06); }
+
+.itemName {
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.itemSub {
+  font-size: 11px;
+  color:#666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+  margin-top: 3px;
+}
+
+.itemBtns { display:flex; gap:6px; }
+.smallBtn {
+  border: 1px solid #cfd4da;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.smallBtn:hover { background:#f3f4f6; }
+.smallBtn.primary { border-color:#0d6efd; color:#0d6efd; }
+.smallBtn.primary:hover { background: rgba(13,110,253,0.08); }
+
+.hint { margin-top: 8px; font-size: 11px; color:#666; line-height: 1.25; }
+
+.foot {
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 2px 2px;
+}
+.copy {
+  font-size: 11px;
+  color: #666;
+  text-decoration: none;
+}
+.copy:hover { text-decoration: underline; }
+.muted { font-size: 11px; color:#999; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+
+/* Поле ввода имени прямо в карточке */
+.nameEditInp {
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid #0d6efd;
+  border-radius: 4px;
+  width: 140px;
+}
+
+/* Кнопки действий (Edit, Delete) */
+.iconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.6;
+  font-size: 14px;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+}
+.iconBtn:hover { opacity: 1; background: rgba(0,0,0,0.05); border-radius: 4px; }
+.iconBtn.del:hover { color: #dc3545; background: rgba(220,53,69,0.1); }
+
+/* Контейнер заголовка с кнопками */
+.itemHeadRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.itemTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
