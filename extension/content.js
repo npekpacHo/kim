@@ -40,7 +40,7 @@
   // 1. CONFIG
   // ==========================================
   const CFG = {
-      ver: "v.2.0.8", 
+      ver: "v.2.0.9", 
       diMax: 40, doMax: 32, adcMax: 4, sensorMax: 0, dacMax: 0,
       Z32: "00000000000000000000000000000000",
       detailUrl: "/ifttt_edit.html",
@@ -72,14 +72,14 @@
         if(c !== null && c !== undefined) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
     });
     return n;
+  };
+
   const limitName15 = (s) => {
     if (s === undefined || s === null) return "";
     s = String(s).trim();
     // KinCony хранит максимум 15 символов (по факту: 15 codepoints).
     const chars = [...s];
     return (chars.length > 15) ? chars.slice(0, 15).join("") : s;
-  };
-
   };
 
   function parseRanges(str) {
@@ -130,7 +130,14 @@
       } catch(e) {}
 
       try {
-          const names = await API.getNames();
+          const namesRaw = await API.getNames();
+              const names = (namesRaw && namesRaw.data) ? namesRaw.data : namesRaw;
+              if(namesRaw && namesRaw.error) setLog(`WARN: /monitor/get error: ${namesRaw.error}`);
+              if(namesRaw && namesRaw.status && namesRaw.text && !(names && (Array.isArray(names.inputs)||Array.isArray(names.outputs)))) {
+                  const t = String(namesRaw.text);
+                  setLog(`WARN: /monitor/get status=${namesRaw.status} ok=${!!namesRaw.ok} body=${t.slice(0,140).replace(/\s+/g,' ')}`);
+              }
+
           if(names) {
               if(names.input_num) diMax = parseInt(names.input_num) || diMax;
               if(names.output_num) doMax = parseInt(names.output_num) || doMax;
@@ -156,20 +163,24 @@
   function parseBackupJson(rawText) {
       // Supports:
       // 1) old format: [rule, rule, ...]
-      // 2) new format: { meta:{...}, rules:[...] }
+      // 2) new format: { meta:{...}, rules:[...], io:{di:[...], do:[...]} }
       // 3) single rule: { ...rule... }
-      // 4) wrapped single: { meta:{...}, rule:{...} }
+      // 4) wrapped single: { meta:{...}, rule:{...}, io:{...} }
       const obj = JSON.parse(rawText);
-      if(Array.isArray(obj)) return { meta:null, rules: obj, single:false };
+      const io = (!Array.isArray(obj) && obj && typeof obj === "object")
+          ? (obj.io || obj.names || obj.monitor || null)
+          : null;
+
+      if(Array.isArray(obj)) return { meta:null, rules: obj, single:false, io:null };
+
       if(obj && typeof obj === "object") {
-          if(Array.isArray(obj.rules)) return { meta: obj.meta || null, rules: obj.rules, single:false };
-          if(obj.rule) return { meta: obj.meta || null, rules: [obj.rule], single:true };
+          if(Array.isArray(obj.rules)) return { meta: obj.meta || null, rules: obj.rules, single:false, io };
+          if(obj.rule) return { meta: obj.meta || null, rules: [obj.rule], single:true, io };
           // looks like a single rule
-          if(obj.if_items || obj.then_items) return { meta:null, rules:[obj], single:true };
+          if(obj.if_items || obj.then_items) return { meta:null, rules:[obj], single:true, io:null };
       }
       throw new Error("Непонятный формат JSON");
   }
-
   function clipMaskToDoMax(hexMask, doMax) {
       const arr = parseMaskToArr(hexMask);
       const ok = arr.filter(x => x >= 1 && x <= doMax);
@@ -241,8 +252,10 @@
       return { rule: pr, disabled, notes };
   }
 
-  function wrapBackup(meta, rules) {
-      return { meta, rules };
+  function wrapBackup(meta, rules, io) {
+      const out = { meta, rules };
+      if(io) out.io = io;
+      return out;
   }
 
   // --- HEX MASK GENERATOR (Версия 1.7.4 - Проверенная) ---
@@ -323,6 +336,16 @@
   // 3. API LAYER
   // ==========================================
   async function apiPost(path, body = null) {
+  // Safety: NEVER write DI/DO names back to controller from the extension.
+  // (Names should be edited only in the native UI.)
+  if (path === "/monitor/set" && body) {
+      const t = (body.type ?? "").toString().toLowerCase();
+      if (t === "input" || t === "output" || t === "di" || t === "do") {
+          console.warn("SKIP: /monitor/set for DI/DO is disabled (read-only names)", body);
+          return { ok: true, skipped: true };
+      }
+  }
+
       try {
           const res = await fetch(`${BASE}${path}`, {
               method: "POST", credentials: "include",
@@ -368,7 +391,7 @@
           } catch(e) { return { ok: false }; }
       },
       getNames: () => apiPost("/monitor/get", null),
-      setName: (type, id, name) => apiPost("/monitor/set", { type, id, name: limitName15(name) }),
+      setName: (type, id, name) => { console.warn("SKIP: setName disabled", {type, id, name}); return Promise.resolve({ ok:true, skipped:true }); },
       getAllDatas: () => apiCgi("get_all_datas"),
       setOutput: (id, val) => apiCgi("set_output", id, val),
       getInputs: () => apiCgi("get_inputs"),
@@ -1022,7 +1045,36 @@
               setLog(`Exp ID ${list.rows[i].id} (${i+1}/${list.rows.length})`);
           }
 
-          const payload = wrapBackup(meta, rules);
+          let io = null;
+          try{
+              setLog(">>> Экспорт: читаю имена входов/выходов...");
+              const names = await API.getNames();
+              if(names && (Array.isArray(names.inputs) || Array.isArray(names.outputs))) {
+                  const di = Array(meta.diMax || 0).fill("");
+                  const doArr = Array(meta.doMax || 0).fill("");
+
+                  if(Array.isArray(names.inputs)) {
+                      for(const it of names.inputs){
+                          const id = parseInt(it.id);
+                          if(id>=1 && id<=di.length) di[id-1] = limitName15((it.name||""));
+                      }
+                  }
+                  if(Array.isArray(names.outputs)) {
+                      for(const it of names.outputs){
+                          const id = parseInt(it.id);
+                          if(id>=1 && id<=doArr.length) doArr[id-1] = limitName15((it.name||""));
+                      }
+                  }
+                  io = { di, do: doArr };
+                  setLog(`OK: прочитано имён: DI=${di.filter(Boolean).length}/${di.length}, DO=${doArr.filter(Boolean).length}/${doArr.length}`);
+              } else {
+                  setLog("WARN: /monitor/get не вернул inputs/outputs (пропускаю имена)");
+              }
+          } catch(e) {
+              setLog("WARN: не удалось прочитать имена DI/DO: " + (e && e.message ? e.message : String(e)));
+          }
+
+          const payload = wrapBackup(meta, rules, io);
           const a = document.createElement("a");
           a.href = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
           a.download = buildBackupFilename(meta, "allifttt_backup");
@@ -1068,6 +1120,69 @@
                       else setLog(`Imp ID ${cleanRule.id}: OK`);
 
                       if(i>0 && i%10===0) await sleep(1200); else await sleep(220);
+                  }
+
+                  // --- Apply DI/DO names (optional) ---
+                  const io = parsed.io;
+                  if(io && (Array.isArray(io.di) || Array.isArray(io.do))) {
+                      setLog(">>> Импорт: восстанавливаю имена DI/DO...");
+
+                      let cur = null;
+                      try { cur = await API.getNames(); } catch(e){ cur = null; }
+
+                      const curDi = Array(current.diMax || 0).fill("");
+                      const curDo = Array(current.doMax || 0).fill("");
+
+                      if(cur) {
+                          if(Array.isArray(cur.inputs)) {
+                              for(const it of cur.inputs){
+                                  const id = parseInt(it.id);
+                                  if(id>=1 && id<=curDi.length) curDi[id-1] = limitName15((it.name||""));
+                              }
+                          }
+                          if(Array.isArray(cur.outputs)) {
+                              for(const it of cur.outputs){
+                                  const id = parseInt(it.id);
+                                  if(id>=1 && id<=curDo.length) curDo[id-1] = limitName15((it.name||""));
+                              }
+                          }
+                      }
+
+                      const tasks = [];
+                      const diNew = Array.isArray(io.di) ? io.di : [];
+                      const doNew = Array.isArray(io.do) ? io.do : [];
+
+                      for(let i=0;i<curDi.length;i++){
+                          if(i < diNew.length){
+                              const name = limitName15((diNew[i]||""));
+                              if(name !== curDi[i]) tasks.push({ type:"input", id:i+1, name });
+                          }
+                      }
+                      for(let i=0;i<curDo.length;i++){
+                          if(i < doNew.length){
+                              const name = limitName15((doNew[i]||""));
+                              if(name !== curDo[i]) tasks.push({ type:"output", id:i+1, name });
+                          }
+                      }
+
+                      if(!tasks.length){
+                          setLog("OK: имена DI/DO уже совпадают (ничего не пишу)");
+                      } else {
+                          setLog(`К изменению: ${tasks.length} имён (пишу по одному, медленно)`);
+
+                          let done = 0;
+                          for(let k=0; k<tasks.length; k++){
+                              const t = tasks[k];
+                              await API.setName(t.type, t.id, t.name);
+                              done++;
+                              setLog(`Name ${t.type==="input"?"DI":"DO"}${t.id}: "${t.name}"`);
+                              if(done>0 && done%10===0) await sleep(1200); else await sleep(220);
+                          }
+                          setLog(`OK: применено имён: ${done}`);
+                      }
+                      try { refreshNames(); } catch(e) {}
+                  } else {
+                      setLog(">>> Импорт: в файле нет имён DI/DO (пропускаю)");
                   }
 
                   setLog(`Итог: OK ${rules.length - disabledCount}, DISABLED ${disabledCount}, маски DO обрезаны: ${clippedMasksCount}`);
@@ -1143,6 +1258,7 @@ alert("Импорт завершён");
       const top=el("div",{class:"kcs_row",style:"flex:0 0 auto;border-bottom:1px solid #eee;padding-bottom:5px"},
           el("button",{class:"kcs_btn primary",onclick:()=>sendGlobalCmd(1)},"ВКЛ ВСЁ"),
           el("button",{class:"kcs_btn danger",onclick:()=>sendGlobalCmd(0)},"ВЫКЛ ВСЁ"),
+          el("button",{class:"kcs_btn",onclick:()=>{ try{ if(window.KCS_IoNameEditor&&window.KCS_IoNameEditor.open){window.KCS_IoNameEditor.open();} else {console.warn("KCS_IoNameEditor not loaded");}}catch(e){console.warn(e);} }},"Имена DI/DO"),
 		  el("div",{style:"margin-left:50px;color:#666;font-size:11px"}, "Состояние DI / DO отображается с небольшой задержкой. Приоритет у комманд переключения.")
       );
       const split=el("div",{style:"flex:1;display:flex;gap:15px;overflow:hidden"});
