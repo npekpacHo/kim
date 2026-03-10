@@ -1,7 +1,5 @@
 (function(){
   if (window.__KCS_HELPER_LOADED__) return;
-  window.__KCS_HELPER_LOADED__ = true;
-
   // Safety: run ONLY on localhost/private LAN addresses.
   // Chrome match patterns cannot express IP ranges like 192.168.*.*,
   // so we gate execution here instead of in manifest.json.
@@ -23,13 +21,20 @@
 
     if (a === 127) return true;                 // loopback
     if (a === 10) return true;                  // 10.0.0.0/8
-    if (a === 192 && b === 168) return true;    // 192.168.0.0/16
+    if (a === 192 && b === 168) return true;   // 192.168.0.0/16
     if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
 
     return false;
   };
 
   if (!__KCS_IS_LOCAL_HOST__(location.hostname)) return;
+
+  const __KIM_KEY_ENABLED__ = "kim_enabled";
+  const __KIM_DEFAULT_ENABLED__ = true;
+
+  const __kim_run__ = () => {
+    if (window.__KCS_HELPER_LOADED__) return;
+    window.__KCS_HELPER_LOADED__ = true;
 
 
 // content.js
@@ -40,7 +45,7 @@
   // 1. CONFIG
   // ==========================================
   const CFG = {
-      ver: "v.2.0.9", 
+      ver: "v.2.1", 
       diMax: 40, doMax: 32, adcMax: 4, sensorMax: 0, dacMax: 0,
       Z32: "00000000000000000000000000000000",
       detailUrl: "/ifttt_edit.html",
@@ -398,6 +403,30 @@
       getOutputs: () => apiCgi("get_outputs"),
       getAdcs: () => apiCgi("get_adcs"),
       getDacs: () => apiCgi("get_dacs"),
+	  
+	  setNameImport: async (type, id, name) => {
+    try {
+        const res = await fetch(`${BASE}/monitor/set`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({ type, id, name })
+        });
+        const txt = await res.text();
+        try {
+            const json = JSON.parse(txt);
+            if (json.ok === undefined) json.ok = (json.code === 200 || json.code === 0 || json.status === "success");
+            return json;
+        } catch {
+            return { text: txt, status: res.status, ok: res.ok };
+        }
+    } catch (e) {
+        return { ok: false, error: String(e) };
+    }
+},
 
 	  setAllOutputs: (val) => apiCgi("set_all_outputs", 0, val ? 1 : 0),
       // CGI set_outputs needs 16 chars. IFTTT uses 32. Truncate for CGI.
@@ -1048,7 +1077,8 @@
           let io = null;
           try{
               setLog(">>> Экспорт: читаю имена входов/выходов...");
-              const names = await API.getNames();
+              const namesRaw = await API.getNames();
+              const names = (namesRaw && namesRaw.data) ? namesRaw.data : namesRaw;
               if(names && (Array.isArray(names.inputs) || Array.isArray(names.outputs))) {
                   const di = Array(meta.diMax || 0).fill("");
                   const doArr = Array(meta.doMax || 0).fill("");
@@ -1122,36 +1152,63 @@
                       if(i>0 && i%10===0) await sleep(1200); else await sleep(220);
                   }
 
-                  // --- Apply DI/DO names (optional) ---
-                  const io = parsed.io;
-                  if(io && (Array.isArray(io.di) || Array.isArray(io.do))) {
-                      setLog(">>> Импорт: восстанавливаю имена DI/DO...");
+// --- Apply DI/DO names (optional) ---
+const io = parsed.io;
+if(io && (Array.isArray(io.di) || Array.isArray(io.do) || Array.isArray(io.inputs) || Array.isArray(io.outputs))) {
+    setLog(">>> Импорт: восстанавливаю имена DI/DO...");
 
-                      let cur = null;
-                      try { cur = await API.getNames(); } catch(e){ cur = null; }
+    let cur = null;
+try {
+    const curRaw = await API.getNames();
+    cur = (curRaw && curRaw.data) ? curRaw.data : curRaw;
+} catch(e){
+    cur = null;
+}
 
-                      const curDi = Array(current.diMax || 0).fill("");
-                      const curDo = Array(current.doMax || 0).fill("");
+    const curDi = Array(current.diMax || 0).fill("");
+    const curDo = Array(current.doMax || 0).fill("");
 
-                      if(cur) {
-                          if(Array.isArray(cur.inputs)) {
-                              for(const it of cur.inputs){
-                                  const id = parseInt(it.id);
-                                  if(id>=1 && id<=curDi.length) curDi[id-1] = limitName15((it.name||""));
-                              }
-                          }
-                          if(Array.isArray(cur.outputs)) {
-                              for(const it of cur.outputs){
-                                  const id = parseInt(it.id);
-                                  if(id>=1 && id<=curDo.length) curDo[id-1] = limitName15((it.name||""));
-                              }
-                          }
-                      }
+    if(cur) {
+        if(Array.isArray(cur.inputs)) {
+            for(const it of cur.inputs){
+                const id = parseInt(it.id);
+                if(id>=1 && id<=curDi.length) curDi[id-1] = limitName15((it.name||""));
+            }
+        }
+        if(Array.isArray(cur.outputs)) {
+            for(const it of cur.outputs){
+                const id = parseInt(it.id);
+                if(id>=1 && id<=curDo.length) curDo[id-1] = limitName15((it.name||""));
+            }
+        }
+    }
 
-                      const tasks = [];
-                      const diNew = Array.isArray(io.di) ? io.di : [];
-                      const doNew = Array.isArray(io.do) ? io.do : [];
+    const normalizeNamesArray = (v) => {
+        if (!v) return [];
+        if (Array.isArray(v)) {
+            // Формат A: ["name1", "name2", ...]
+            if (!v.length) return [];
 
+            // Формат B: [{id:1,name:"..."}, ...]
+            if (typeof v[0] === "object" && v[0]) {
+                const maxId = v.reduce((m, it) => Math.max(m, parseInt(it.id) || 0), 0);
+                const arr = Array(maxId || 0).fill("");
+                for (const it of v) {
+                    const id = parseInt(it.id);
+                    if (id >= 1 && id <= arr.length) arr[id - 1] = (it.name || "");
+                }
+                return arr;
+            }
+
+            // Формат C: смешанный
+            return v.map((x) => (typeof x === "string" ? x : (x?.name || "")));
+        }
+        return [];
+    };
+
+    const tasks = [];
+    const diNew = normalizeNamesArray(io.di ?? io.inputs ?? io.input ?? io.DI ?? io.IN);
+    const doNew = normalizeNamesArray(io.do ?? io.outputs ?? io.output ?? io.DO ?? io.OUT);
                       for(let i=0;i<curDi.length;i++){
                           if(i < diNew.length){
                               const name = limitName15((diNew[i]||""));
@@ -1173,7 +1230,7 @@
                           let done = 0;
                           for(let k=0; k<tasks.length; k++){
                               const t = tasks[k];
-                              await API.setName(t.type, t.id, t.name);
+                             await API.setNameImport(t.type, t.id, t.name);
                               done++;
                               setLog(`Name ${t.type==="input"?"DI":"DO"}${t.id}: "${t.name}"`);
                               if(done>0 && done%10===0) await sleep(1200); else await sleep(220);
@@ -1326,7 +1383,8 @@ const state = { ws: null, wsConnected: false, di: [], do: [], adcs: [], dacs: []
   function updateConnStatus() { const b=document.getElementById("kcs_ws_badge"); if(b) b.className = state.wsConnected ? "kcs_ws_status on" : "kcs_ws_status warn"; if(b) b.textContent = state.wsConnected?"WS":"HTTP"; }
 
   async function refreshNames() {
-  const res = await API.getNames();
+  const raw = await API.getNames();
+  const res = (raw && raw.data) ? raw.data : raw;
   if (!res) return;
 
   if (res.input_num !== undefined) CFG.diMax = parseInt(res.input_num, 10) || CFG.diMax;
@@ -2144,4 +2202,20 @@ function startAdaptivePolling() {
   })();
 
 })();
+
+  }; // __kim_run__
+
+  try {
+    if (chrome?.storage?.local) {
+      chrome.storage.local.get({ [__KIM_KEY_ENABLED__]: __KIM_DEFAULT_ENABLED__ }, (res) => {
+        const enabled = res?.[__KIM_KEY_ENABLED__] !== false; // default ON
+        if (enabled) __kim_run__();
+      });
+    } else {
+      __kim_run__();
+    }
+  } catch (e) {
+    __kim_run__();
+  }
+
 })();
