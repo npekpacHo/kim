@@ -2,12 +2,16 @@ const KEY_LAST = "kcs_last_origin";
 const KEY_AUTOSTART = "kcs_autostart_origin";
 const KEY_ACTIVE = "kcs_active_origin";
 const KEY_CONTROLLERS = "kcs_controllers_v1";
+const KEY_ENABLED = "kim_enabled";
 
 const $ = (id) => document.getElementById(id);
 const hostInp = $("host");
 const st = $("status");
 const listEl = $("list");
 const netHint = $("netHint");
+const swEnabled = $("swEnabled");
+const enabledLabel = $("enabledLabel");
+const enabledHint = $("enabledHint");
 
 // --- HELPERS ---
 
@@ -349,6 +353,7 @@ async function openController() {
 async function startOnThisPage() {
   const tab = await getActiveTab();
   if (!tab?.id) return setStatus("Не вижу активную вкладку", false);
+  if (!(await isEnabled())) return setStatus("KIM сейчас выключен (ползунок вверху).", false);
 
   const origin = normalizeToOrigin(hostInp.value);
   if (origin) await storageSet({ [KEY_LAST]: origin, [KEY_ACTIVE]: origin });
@@ -471,11 +476,25 @@ async function clearAll() {
   setStatus("Настройки сброшены", true);
 }
 
+async function isEnabled() {
+  const v = await storageGet([KEY_ENABLED]);
+  return v?.[KEY_ENABLED] !== false; // default ON
+}
+
+function applyEnabledUi(enabled) {
+  if (swEnabled) swEnabled.checked = !!enabled;
+  if (enabledLabel) enabledLabel.textContent = enabled ? "😄 включено" : "😴 выключено";
+  if (enabledHint) enabledHint.style.opacity = enabled ? "1" : "0.85";
+  const btnStart = $("btnStart");
+  if (btnStart) btnStart.disabled = !enabled;
+}
+
 // --- INIT ---
 
 (async function init() {
-  const saved = await storageGet([KEY_LAST]);
-  if (saved?.[KEY_LAST]) hostInp.value = saved[KEY_LAST];
+  const saved = await storageGet([KEY_LAST, KEY_ENABLED]);
+if (saved?.[KEY_LAST]) hostInp.value = saved[KEY_LAST];
+applyEnabledUi(saved?.[KEY_ENABLED] !== false);
   const list = await loadControllers();
   renderControllers(list);
   netHint.textContent = "LAN / Wi-Fi";
@@ -483,6 +502,34 @@ async function clearAll() {
 })();
 
 // LISTENERS
+swEnabled.addEventListener("change", async () => {
+  const enabled = !!swEnabled.checked;
+  await storageSet({ [KEY_ENABLED]: enabled });
+  applyEnabledUi(enabled);
+
+  try {
+    const tab = await getActiveTab();
+    if (!tab?.id) return;
+
+    chrome.tabs.sendMessage(tab.id, { type: "kim_enabled", enabled }, () => {
+      const err = chrome.runtime.lastError;
+      if (!err) return;
+
+      const msg = String(err.message || "");
+      if (
+        msg.includes("Could not establish connection") ||
+        msg.includes("Receiving end does not exist")
+      ) {
+        // Это нормально: на вкладке просто нет content script
+        return;
+      }
+
+      console.warn("kim_enabled sendMessage error:", err.message);
+    });
+  } catch (e) {
+    console.warn("kim_enabled toggle failed:", e);
+  }
+});
 $("btnThis").addEventListener("click", setFromThisPage);
 $("btnOpen").addEventListener("click", openController);
 $("btnStart").addEventListener("click", startOnThisPage);
