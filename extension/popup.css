@@ -215,3 +215,31 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
   flex: 1;
   min-width: 0;
 }
+/* --- KIM enable/disable switch --- */
+.row.between { justify-content: space-between; align-items: center; }
+.toggleMeta { display:flex; flex-direction:column; gap:2px; }
+.lblSmall { font-size: 11px; color:#666; font-weight:600; }
+.enabledHint { margin-top: 6px; }
+
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; flex: 0 0 auto; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0;
+  cursor: pointer;
+  background: #c6c6c6;
+  transition: .18s;
+  border-radius: 999px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px; width: 18px;
+  left: 3px; top: 3px;
+  background: #fff;
+  transition: .18s;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.switch input:checked + .slider { background: #2b8a3e; }
+.switch input:checked + .slider:before { transform: translateX(20px); }
+.switch input:focus-visible + .slider { box-shadow: 0 0 0 3px rgba(43,138,62,.25); }
