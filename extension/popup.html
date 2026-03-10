@@ -20,6 +20,20 @@
     </header>
 
     <section class="card">
+	  <div class="row between">
+  <div class="toggleMeta">
+    <div class="lblSmall">Расширение</div>
+    <div id="enabledLabel" class="muted">включено</div>
+  </div>
+  <label class="switch" title="Включить/выключить KIM">
+    <input type="checkbox" id="swEnabled" checked>
+    <span class="slider"></span>
+  </label>
+</div>
+
+<div id="enabledHint" class="hint enabledHint">
+  Можно усыпить скрипты если KIM пока не требуется.
+</div>
       <label class="lbl" for="host">IP / Host / URL</label>
       <input id="host" class="inp" placeholder="192.168.1.11 или 192.168.0.4" />
 
@@ -57,7 +71,7 @@
       <a class="copy" href="https://t.me/elekt_riki" target="_blank" rel="noopener noreferrer">
         © elekt_riki • 2026
       </a>
-      <span class="muted">KIM Helper v0.21</span>
+      <span class="muted">KIM Helper v0.22</span>
     </footer>
   </div>
 
