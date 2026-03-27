@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Chrome](https://img.shields.io/badge/Chrome-Compatible-green.svg)](https://www.google.com/chrome/)
-[![Version](https://img.shields.io/badge/version-2.1-blue.svg)](https://github.com/npekpacHo/kincony-smart-control/releases)
+[![Version](https://img.shields.io/badge/version-2.11-blue.svg)](https://github.com/npekpacHo/kincony-smart-control/releases)
 
 ---
 
