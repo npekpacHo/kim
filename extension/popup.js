@@ -12,6 +12,13 @@ const netHint = $("netHint");
 const swEnabled = $("swEnabled");
 const enabledLabel = $("enabledLabel");
 const enabledHint = $("enabledHint");
+const START_FILES = [
+  "content.js",
+  "io_name_editor.js",
+  "presets/local_master.js",
+  "presets/global_master.js",
+  "presets/bathroom_vent.js"
+];
 
 // --- HELPERS ---
 
@@ -44,6 +51,20 @@ function storageRemove(keys) {
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
+}
+
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        const err = chrome.runtime.lastError;
+        if (err) return resolve({ ok: false, error: String(err.message || err) });
+        resolve({ ok: true, response });
+      });
+    } catch (e) {
+      resolve({ ok: false, error: String(e && e.message ? e.message : e) });
+    }
+  });
 }
 
 function normalizeToOrigin(input) {
@@ -365,33 +386,46 @@ async function startOnThisPage() {
         func: () => ({
           loaded: !!window.__KCS_HELPER_LOADED__,
           hasPanel: !!document.getElementById("kcs_pnl"),
+          hasMin: !!document.getElementById("kcs_min"),
+          presets: Array.isArray(window.__KCS_PRESET_REGISTRY__) ? window.__KCS_PRESET_REGISTRY__.length : 0,
         }),
       });
-      return res?.[0]?.result || { loaded: false, hasPanel: false };
-    } catch (e) { return null; }
+      return res?.[0]?.result || { loaded: false, hasPanel: false, hasMin: false, presets: 0 };
+    } catch (e) {
+      return null;
+    }
   };
 
   const before = await probe();
-  if (before && (before.loaded || before.hasPanel)) return setStatus("UI уже запущен", true);
+  if (before && (before.hasPanel || before.hasMin)) return setStatus("UI уже запущен", true);
 
-  // Сначала CSS
+  const wake = await sendTabMessage(tab.id, { type: "kim_enabled", enabled: true });
+  if (wake.ok) {
+    await new Promise((r) => setTimeout(r, 200));
+    const afterWake = await probe();
+    if (afterWake && (afterWake.hasPanel || afterWake.hasMin || afterWake.loaded)) {
+      return setStatus(`UI запущен ✅${afterWake.presets ? ` Пресетов: ${afterWake.presets}` : ""}`, true);
+    }
+  }
+
   try {
     await chrome.scripting.insertCSS({
-        target: { tabId: tab.id },
-        files: ["content.css"],
+      target: { tabId: tab.id },
+      files: ["content.css"],
     });
-  } catch(e) {}
+  } catch (e) {}
 
-  // Потом JS
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: START_FILES });
   } catch (e) {
     return setStatus("Не могу внедрить скрипт. Страница не подходит.", false);
   }
 
-  await new Promise((r) => setTimeout(r, 150));
+  await new Promise((r) => setTimeout(r, 250));
   const after = await probe();
-  if (after && (after.loaded || after.hasPanel)) return setStatus("UI запущен ✅", true);
+  if (after && (after.hasPanel || after.hasMin || after.loaded)) {
+    return setStatus(`UI запущен ✅${after.presets ? ` Пресетов: ${after.presets}` : ""}`, true);
+  }
   setStatus("Скрипт внедрен, но UI не появился.", false);
 }
 
