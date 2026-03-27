@@ -1,5 +1,4 @@
 (function(){
-  if (window.__KCS_HELPER_LOADED__) return;
   // Safety: run ONLY on localhost/private LAN addresses.
   // Chrome match patterns cannot express IP ranges like 192.168.*.*,
   // so we gate execution here instead of in manifest.json.
@@ -32,8 +31,66 @@
   const __KIM_KEY_ENABLED__ = "kim_enabled";
   const __KIM_DEFAULT_ENABLED__ = true;
 
+  // Preset registry must exist even when KIM is sleeping.
+  window.__KCS_PRESET_REGISTRY__ = window.__KCS_PRESET_REGISTRY__ || [];
+  window.__KCS_REGISTER_PRESET__ = window.__KCS_REGISTER_PRESET__ || function(p) {
+    try {
+      if (!p || typeof p !== "object") return;
+      const id = (p.id || "").toString();
+      if (!id) return;
+      const reg = window.__KCS_PRESET_REGISTRY__;
+      if (reg.some(x => x && x.id === id)) return;
+      reg.push(p);
+    } catch (e) {}
+  };
+
+  if (!window.__KIM_MESSAGE_BRIDGE_READY__ && chrome?.runtime?.onMessage) {
+    window.__KIM_MESSAGE_BRIDGE_READY__ = true;
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      try {
+        if (!msg || typeof msg !== "object") return;
+
+        if (msg.type === "kim_ping") {
+          sendResponse({
+            ok: true,
+            loaded: !!window.__KCS_HELPER_LOADED__,
+            hasPanel: !!document.getElementById("kcs_pnl"),
+            presets: (window.__KCS_PRESET_REGISTRY__ || []).length
+          });
+          return;
+        }
+
+        if (msg.type === "kim_enabled") {
+          const enabled = msg.enabled !== false;
+          if (enabled) {
+            __kim_run__();
+            try { window.__KIM_CONTROL__?.resume?.(); } catch (_) {}
+          } else {
+            try { window.__KIM_CONTROL__?.suspend?.(); } catch (_) {}
+          }
+          sendResponse({
+            ok: true,
+            enabled,
+            loaded: !!window.__KCS_HELPER_LOADED__,
+            hasPanel: !!document.getElementById("kcs_pnl"),
+            presets: (window.__KCS_PRESET_REGISTRY__ || []).length
+          });
+          return true;
+        }
+      } catch (e) {
+        try {
+          sendResponse({ ok: false, error: String(e && e.message ? e.message : e) });
+        } catch (_) {}
+        return true;
+      }
+    });
+  }
+
   const __kim_run__ = () => {
-    if (window.__KCS_HELPER_LOADED__) return;
+    if (window.__KCS_HELPER_LOADED__) {
+      try { window.__KIM_CONTROL__?.resume?.(); } catch (_) {}
+      return;
+    }
     window.__KCS_HELPER_LOADED__ = true;
 
 
@@ -45,7 +102,7 @@
   // 1. CONFIG
   // ==========================================
   const CFG = {
-      ver: "v.2.1", 
+      ver: "v.2.11", 
       diMax: 40, doMax: 32, adcMax: 4, sensorMax: 0, dacMax: 0,
       Z32: "00000000000000000000000000000000",
       detailUrl: "/ifttt_edit.html",
@@ -1378,7 +1435,7 @@ alert("Импорт завершён");
       m.style.display = show ? "flex" : "none";
   }
 
-const state = { ws: null, wsConnected: false, di: [], do: [], adcs: [], dacs: [], sensors: [], diNames: [], doNames: [], adcMeta: [], dacMeta: [], sensorMeta: [], fullRulesCache: [], pollTimer: null, singleImportTargetId: null, lastSysInfo: null, pendingDo: [], pendingDoValue: [], pendingDoTimer: [], wsInFlight: false, wsInFlightAt: 0 };
+const state = { ws: null, wsConnected: false, di: [], do: [], adcs: [], dacs: [], sensors: [], diNames: [], doNames: [], adcMeta: [], dacMeta: [], sensorMeta: [], fullRulesCache: [], pollTimer: null, singleImportTargetId: null, lastSysInfo: null, pendingDo: [], pendingDoValue: [], pendingDoTimer: [], wsInFlight: false, wsInFlightAt: 0, suspended: false };
   for(let i=0; i<128; i++) { state.diNames.push(""); state.doNames.push(""); }
   function updateConnStatus() { const b=document.getElementById("kcs_ws_badge"); if(b) b.className = state.wsConnected ? "kcs_ws_status on" : "kcs_ws_status warn"; if(b) b.textContent = state.wsConnected?"WS":"HTTP"; }
 
@@ -1638,8 +1695,14 @@ const state = { ws: null, wsConnected: false, di: [], do: [], adcs: [], dacs: []
 function startAdaptivePolling() {
       // Сбрасываем текущий таймер, чтобы не наслоились два цикла
       if(state.pollTimer) clearTimeout(state.pollTimer);
+      state.pollTimer = null;
+      if(state.suspended) return;
 
       const loop = async () => {
+          if(state.suspended) {
+              state.pollTimer = null;
+              return;
+          }
           // Если вкладка не активна — замедляемся до 2 сек, экономим ресурсы
           if(document.hidden) { 
               state.pollTimer = setTimeout(loop, 2000); 
@@ -1679,11 +1742,24 @@ function startAdaptivePolling() {
   }
 
   function wsConnect(){
+      if(state.suspended) return;
       if(state.ws && state.ws.readyState <= 1) return;
       state.ws = new WebSocket(WS_URL);
-      state.ws.onopen = () => { state.wsConnected = true; updateConnStatus(); state.ws.send(JSON.stringify({cmd:"get all datas"})); };
-      state.ws.onmessage = (e) => { try { handleDataPacket(JSON.parse(e.data)); } catch(e){} };
-      state.ws.onclose = () => { state.wsConnected = false; updateConnStatus(); setTimeout(wsConnect, CFG.wsReconnectDelay); };
+      state.ws.onopen = () => {
+          if(state.suspended) {
+              try { state.ws && state.ws.close(); } catch(_) {}
+              return;
+          }
+          state.wsConnected = true;
+          updateConnStatus();
+          state.ws.send(JSON.stringify({cmd:"get all datas"}));
+      };
+      state.ws.onmessage = (e) => { try { if(!state.suspended) handleDataPacket(JSON.parse(e.data)); } catch(e){} };
+      state.ws.onclose = () => {
+          state.wsConnected = false;
+          updateConnStatus();
+          if(!state.suspended) setTimeout(wsConnect, CFG.wsReconnectDelay);
+      };
   }
 
   
@@ -2097,7 +2173,13 @@ function startAdaptivePolling() {
 .kcs_preset_tag{font-size:10px;padding:2px 6px;border-radius:999px;background:#f1f3f5;border:1px solid #dee2e6;color:#495057}
 
 `;
-      const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
+      let s = document.getElementById("kcs_helper_style");
+      if(!s) {
+          s = document.createElement("style");
+          s.id = "kcs_helper_style";
+          s.textContent = css;
+          document.head.appendChild(s);
+      }
 
       const iconUrl = (chrome && chrome.runtime && chrome.runtime.getURL) ? chrome.runtime.getURL("icon.png") : "";
       const minImg = el("img", {src: iconUrl, style:"pointer-events:none; width:100%; height:100%; object-fit:contain;"});
@@ -2178,6 +2260,57 @@ function startAdaptivePolling() {
       tabs.forEach(t=>{ tCont.appendChild(el("div",{class:"kcs_tab",id:`tab_${t.id}`,onclick:()=>openTab(t)}, t.label)); });
       openTab(tabs[0]);
   }
+
+  function destroyUi() {
+      ["kcs_pnl", "kcs_min", "kcs_preset_modal", "kcs_sensor_modal"].forEach((id) => {
+          const node = document.getElementById(id);
+          if (node) node.remove();
+      });
+  }
+
+  function suspendKIM() {
+      state.suspended = true;
+      if(state.pollTimer) {
+          clearTimeout(state.pollTimer);
+          state.pollTimer = null;
+      }
+      if(_cmdLockTimer) {
+          clearTimeout(_cmdLockTimer);
+          _cmdLockTimer = null;
+      }
+      if(state.ws) {
+          try {
+              state.ws.onopen = null;
+              state.ws.onmessage = null;
+              state.ws.onclose = null;
+              state.ws.close();
+          } catch(_) {}
+      }
+      state.ws = null;
+      state.wsConnected = false;
+      destroyUi();
+  }
+
+  function resumeKIM() {
+      if(!state.suspended) {
+          if(!document.getElementById("kcs_pnl") && !document.getElementById("kcs_min")) init();
+          if(!state.pollTimer) startAdaptivePolling();
+          if(!state.wsConnected) wsConnect();
+          return;
+      }
+      state.suspended = false;
+      if(!document.getElementById("kcs_pnl") && !document.getElementById("kcs_min")) init();
+      updateConnStatus();
+      startAdaptivePolling();
+      wsConnect();
+      refreshNames().catch(() => {});
+  }
+
+  window.__KIM_CONTROL__ = {
+      suspend: suspendKIM,
+      resume: resumeKIM,
+      isSuspended: () => !!state.suspended
+  };
 
   // ==========================================
   // BOOTSTRAP
