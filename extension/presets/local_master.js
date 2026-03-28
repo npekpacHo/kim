@@ -7,13 +7,13 @@
     icon: "🔘",
     order: 11,
     tags: ["спальня", "свет", "длинтельное нажатие"],
-    description: "Создаёт одно правило: длительное нажатие на выбранный вход выключает выбранный выход или группу выходов. Подобных правил может быть несколько.",
+    description: "Создаёт локальную мастер-клавишу для комнаты или зоны. Длительное нажатие на выбранную кнопку выключает один или несколько указанных выходов.",
     render: (ctx) => {
       const { el, mkInp, mkInpSm, parseRanges, checkOverwrite, makeHexMask, API, CFG, bindNamePreview } = ctx;
       const l = ctx.log;
 
       const inDi  = mkInp("", "2", {"--kcs-inp-max":"50px"});
-      const inDos = mkInpSm("", "5, 6, 7", {"--kcs-inp-max":"240px"});
+      const inDos = mkInpSm("", "например 1-16 или 1 3 5 7 9", {"--kcs-inp-max":"240px"});
       const inId  = mkInp("1", {"--kcs-inp-max":"80px"});
       inId.style.backgroundColor = "#fff3cd";
 
@@ -29,7 +29,7 @@
         const dos = parseRanges(inDos.value);
         const id = parseInt(inId.value, 10);
 
-        if(!id || !di || !dos.length) return alert("Заполните поля!");
+        if(!id || !di || !dos.length) return alert("Заполни кнопку, выходы и ID правила.");
 
         if(!(await checkOverwrite(id))) return;
 
@@ -46,7 +46,7 @@
 
         if(res && res.ok) {
           l(`OK: правило записано (ID ${id})`);
-          alert("Готово!");
+          alert("Готово! Правило создано.");
         } else {
           l(`ERR: не удалось записать правило (ID ${id})`);
         }
@@ -55,15 +55,19 @@
       const card = el("div",{class:"kcs_card"},
         el("div",{class:"kcs_card_head"},"Локальная мастер-клавиша"),
         el("div",{style:"margin-bottom:10px;color:#666;font-size:11px"},
-          "Создаёт одно правило: длительное нажатие на DI выключает выбранную группу DO."
+          "Этот пресет создаёт одно правило. Долгое нажатие на выбранную кнопку выключает указанные выходы. " +
+          "Подходит для спальни, комнаты или отдельной зоны, где нужно одной кнопкой погасить свет."
         ),
         el("div",{class:"kcs_row", style:"align-items:flex-start"},
-          el("div",{style:"flex:1;min-width:180px"}, el("label",{style:"margin-right:10px"},"Кнопка (DI): "), inDi),
-          el("div",{style:"flex:2;min-width:240px"}, el("label",{style:"margin-right:10px"},"Группы (DO): "), inDos)
+          el("div",{style:"flex:1;min-width:180px"}, el("label",{style:"margin-right:10px"},"Кнопка для выключения (DI): "), inDi),
+          el("div",{style:"flex:2;min-width:240px"}, el("label",{style:"margin-right:10px"},"Какие выходы выключать (DO): "), inDos)
+        ),
+        el("div",{class:"kcs_help", style:"margin-top:8px"},
+          "Можно указать один выход, диапазон 1-16, список через пробел 1 3 5 7 9 или через запятую."
         ),
         el("div",{style:"margin-top:10px;padding-top:10px;border-top:1px solid #eee"},
-          el("label",{style:"margin-right:10px"},"ID правила: "), inId,
-          el("button",{class:"kcs_btn primary", style:"margin-left:10px", onclick:run},"Создать")
+          el("label",{style:"margin-right:10px"},"ID создаваемого правила: "), inId,
+          el("button",{class:"kcs_btn primary", style:"margin-left:10px", onclick:run},"Создать мастер-клавишу")
         )
       );
 
