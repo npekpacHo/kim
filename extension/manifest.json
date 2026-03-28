@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KIM: KCS IFTTT Mass Mapper",
-  "version": "2.0.9",
+  "version": "2.14",
   "description": "Оверлей для управления Kincony: быстрый IFTTT-редактор, мониторинг через WebSocket и перенос правил между контроллерами.",
   "permissions": [
     "storage",
@@ -25,7 +25,9 @@
 		"io_name_editor.js",
         "presets/local_master.js",
         "presets/global_master.js",
-        "presets/bathroom_vent.js"
+        "presets/bathroom_vent.js",
+		"presets/leak_protection.js",
+		"presets/suggest_preset.js"
       ],
       "run_at": "document_idle"
     }
