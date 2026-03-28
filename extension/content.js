@@ -102,7 +102,7 @@
   // 1. CONFIG
   // ==========================================
   const CFG = {
-      ver: "v.2.11", 
+      ver: "v.2.14", 
       diMax: 40, doMax: 32, adcMax: 4, sensorMax: 0, dacMax: 0,
       Z32: "00000000000000000000000000000000",
       detailUrl: "/ifttt_edit.html",
@@ -145,13 +145,39 @@
   };
 
   function parseRanges(str) {
-      if(!str) return [];
+      if(str === undefined || str === null) return [];
+      const src = String(str).trim();
+      if(!src) return [];
+
       const res = [];
-      str.toString().split(",").forEach(s => {
-          const val = parseInt(s.trim());
-          if(!isNaN(val)) res.push(val);
+      const seen = new Set();
+
+      src.split(/[\s,;]+/).forEach(part => {
+          if(!part) return;
+
+          const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+          if(m) {
+              let a = parseInt(m[1], 10);
+              let b = parseInt(m[2], 10);
+              if(Number.isNaN(a) || Number.isNaN(b)) return;
+              if(a > b) [a, b] = [b, a];
+              for(let i = a; i <= b; i++) {
+                  if(!seen.has(i)) {
+                      seen.add(i);
+                      res.push(i);
+                  }
+              }
+              return;
+          }
+
+          const val = parseInt(part, 10);
+          if(!Number.isNaN(val) && !seen.has(val)) {
+              seen.add(val);
+              res.push(val);
+          }
       });
-      return res;
+
+      return res.sort((a,b)=>a-b);
   }
 
   function shortName(s) {
@@ -1351,8 +1377,8 @@ alert("Импорт завершён");
       wrap.appendChild(el("div", {class:"kcs_card"},
           el("div",{class:"kcs_card_head"},"Бэкап / Восстановление (IFTTT)"),
           el("div",{class:"kcs_help"},
-              "Экспорт сохраняет все правила IFTTT + метаданные контроллера (модель, DI/DO). " +
-              "Импорт перезаписывает правила с совпадающими ID. " +
+              "Экспорт, в отличии от недавно появившегося штатного, сохраняет все правила IFTTT + метаданные контроллера (модель, DI/DO) в JSON. " +
+              "Импорт перезаписывает правила с совпадающими ID и не привязывается к конкретному железу " +
               "Если в правилах есть DI/DO вне диапазона текущего контроллера, такие правила автоматически импортируются выключенными (enable=0), а маски выходов обрезаются."
           ),
           el("div",{class:"kcs_actions"},
