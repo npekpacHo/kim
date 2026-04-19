@@ -102,7 +102,7 @@
   // 1. CONFIG
   // ==========================================
   const CFG = {
-      ver: "v.2.14", 
+      ver: "v.2.15", // Версия
       diMax: 40, doMax: 32, adcMax: 4, sensorMax: 0, dacMax: 0,
       Z32: "00000000000000000000000000000000",
       detailUrl: "/ifttt_edit.html",
@@ -745,9 +745,20 @@
             field("Количество", inCount, "", "sm"), field("Старт ID", inRuleId, "", "sm")
         ),
         el("div",{class:"kcs_actions"},
-            el("button",{class:"kcs_btn primary", onclick:()=>runMap(false)},"Создать"),
-            el("button",{class:"kcs_btn", style:"background:#6f42c1;color:#fff", onclick:()=>runMap(true)},"Авто 1:1 (Все)")
-        ),
+  el("button",{class:"kcs_btn primary", onclick:()=>runMap(false)},"Создать"),
+  el("button",{class:"kcs_btn", style:"background:#6f42c1;color:#fff", onclick:()=>runMap(true)},"Авто 1:1 (Все)"),
+  el("button",{
+    class:"kcs_btn",
+    style:"background:#0d6efd;color:#fff",
+    onclick:()=>{
+      if (window.KCS_VisualMapper && typeof window.KCS_VisualMapper.open === "function") {
+        window.KCS_VisualMapper.open();
+      } else {
+        alert("Визуальный редактор не загружен");
+      }
+    }
+  },"Визуальный редактор")
+),
         el("div",{class:"kcs_help"},"Авто 1:1 создаст DI 1→DO 1 ... до максимума доступных выходов."),
         logArea
     ));
